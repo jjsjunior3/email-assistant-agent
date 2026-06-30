@@ -1,0 +1,36 @@
+profile = {
+    "name": "Sarah",
+    "full_name": "Sarah Chen",
+    "user_profile_background": "Engenheira de software sênior liderando uma equipe de 5 desenvolvedores",
+}
+
+prompt_instructions = {
+    "triage_rules": {
+        "ignore": "Newsletters de marketing, e-mails de spam, comunicados gerais da empresa",
+        "notify": "Membro da equipe doente, notificações do sistema de build, atualizações de status de projeto",
+        "respond": "Perguntas diretas de membros da equipe, solicitações de reunião, relatórios de bugs críticos",
+    },
+    "agent_instructions": "Use estas ferramentas quando apropriado para ajudar a gerenciar as tarefas de Sarah de forma eficiente."
+}
+
+# E-mail de teste
+email = {
+    "from": "Alice Smith <alice.smith@company.com>",
+    "to": "Sarah Chen <sarah.chen@company.com>",
+    "subject": "Dúvida rápida sobre a documentação da API",
+    "body": """
+Olá Sarah,
+
+Eu estava revisando a documentação da API para o novo serviço de autenticação
+e notei que alguns endpoints parecem estar faltando nas especificações.
+Você poderia me ajudar a esclarecer se isso foi intencional ou se devemos
+atualizar a documentação?
+
+Especificamente, estou procurando por:
+- /auth/refresh
+- /auth/validate
+
+Obrigada!
+Alice
+""",
+}
