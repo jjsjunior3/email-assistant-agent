@@ -11,8 +11,7 @@ from langmem import create_manage_memory_tool, create_search_memory_tool
 
 # Embeddings do Google para busca semântica
 google_embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/text-embedding-004",
-    google_api_key=os.getenv("GEMINI_API_KEY"),
+    model="gemini-embedding-001",
 )
 
 # Armazenamento em memória RAM
