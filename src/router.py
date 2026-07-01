@@ -1,32 +1,30 @@
-import sys
 import os
+import re
+import json
+from dotenv import load_dotenv
+
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+load_dotenv(os.path.join(_ROOT, '.env'))
+
+import sys
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from pydantic import BaseModel, Field
 from typing_extensions import Literal
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
-from dotenv import load_dotenv
-
-from prompts import triage_system_prompt, triage_user_prompt
-from config import profile, prompt_instructions, email
-
-load_dotenv()
 
 MODEL = "google/gemini-2.5-flash"
 
 
 class Router(BaseModel):
-    """Analisa o e-mail não lido e o roteia de acordo com seu conteúdo."""
-    reasoning: str = Field(
-        description="Raciocínio passo a passo por trás da classificação."
-    )
+    reasoning: str = Field(description="Raciocínio por trás da classificação.")
     classification: Literal["ignore", "respond", "notify"] = Field(
-        description="A classificação do e-mail: ignore, notify ou respond."
+        description="Classificação do e-mail."
     )
 
 
-def criar_llm_router() -> ChatOpenAI:
+def criar_llm_router():
     llm = ChatOpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.getenv("OPENROUTER_API_KEY"),
@@ -36,37 +34,38 @@ def criar_llm_router() -> ChatOpenAI:
     return llm.with_structured_output(Router)
 
 
-def testar_roteador():
-    llm_router = criar_llm_router()
+def classificar_email(messages: list) -> Router:
+    """Classifica com retry e fallback para JSON truncado."""
 
-    system_prompt = triage_system_prompt.format(
-        full_name=profile["full_name"],
-        name=profile["name"],
-        examples="Nenhum",
-        user_profile_background=profile["user_profile_background"],
-        triage_no_prompt_instructions=prompt_instructions["triage_rules"]["ignore"],
-        triage_notify_prompt_instructions=prompt_instructions["triage_rules"]["notify"],
-        triage_email_prompt_instructions=prompt_instructions["triage_rules"]["respond"],
-    )
+    # Tentativa 1: with_structured_output
+    try:
+        llm_router = criar_llm_router()
+        return llm_router.invoke(messages)
+    except Exception:
+        pass
 
-    user_prompt = triage_user_prompt.format(
-        author=email["from"],
-        to=email["to"],
-        subject=email["subject"],
-        email_thread=email["body"],
-    )
+    # Tentativa 2: JSON manual via regex
+    try:
+        llm = ChatOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            model=MODEL,
+            temperature=0,
+        )
+        fallback_messages = messages + [
+            HumanMessage(content='Responda APENAS com JSON válido: {"reasoning": "...", "classification": "ignore|notify|respond"}')
+        ]
+        response = llm.invoke(fallback_messages)
+        texto = response.content
+        match = re.search(r'\{.*\}', texto, re.DOTALL)
+        if match:
+            dados = json.loads(match.group())
+            return Router(
+                reasoning=dados.get("reasoning", "fallback"),
+                classification=dados.get("classification", "ignore")
+            )
+    except Exception:
+        pass
 
-    result = llm_router.invoke([
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_prompt),
-    ])
-
-    print("\n📧 RESULTADO DA TRIAGEM:")
-    print(f"   Classificação : {result.classification.upper()}")
-    print(f"   Raciocínio    : {result.reasoning}")
-
-    return result
-
-
-if __name__ == "__main__":
-    testar_roteador()
+    # Tentativa 3: padrão seguro
+    return Router(reasoning="Erro na classificação", classification="ignore")
